@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#4E8F6B">
+<meta name="format-detection" content="telephone=no">
+<title>社交电量测试 · 你的电还剩几格</title>
+<style>
+/* ============================================================
+   设计变量
+   配色：主色「温泉绿」#4E8F6B 是全站唯一的强调色（配水豚棕）。
+   选绿的理由：卡皮巴拉最经典的形象是泡温泉冒热气，绿比黄更贴题，
+   而且绿+棕对比舒服。别处不再引入第二种主色。
+   圆角：卡片 26px / 内层 18px / 按钮与标签全圆角。
+   ============================================================ */
+:root{
+  --y:#4E8F6B; --y-deep:#3C7455; --y-soft:#E4F0E7;
+  --cream:#FBF7F0; --cream-2:#EFE7DA;
+  --ink:#1F1B15; --ink-2:#5C4E3A; --ink-3:#8C7A5C; --line:#E2D8C8;
+  --card:#FFFFFF; --coral:#FF6F5E; --blue:#7FC4F0;
+  --r-card:26px; --r-inner:18px;
+  --shadow:0 10px 30px rgba(120,86,10,.10);
+  --shadow-s:0 4px 14px rgba(120,86,10,.08);
+  --ease:cubic-bezier(.22,1,.36,1);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+*{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html{ -webkit-text-size-adjust:100%; }
+html,body{ min-height:100%; }
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--cream); color:var(--ink); line-height:1.6;
+  /* 不再强制 antialiased：iOS 上那个会让细字变灰变糊，交给系统默认更清楚 */
+  overflow-x:hidden;
+}
+body.locked{ position:fixed; inset:0; width:100%; overflow:hidden; }
+img,svg{ display:block; }
+/* 真图模式（目前已停用）：透明底的直接摆；带场景底的那两张加圆角底衬 */
+.dino-img{ object-fit:contain; }
+.dino-img.dino-opaque{ border-radius:22px; background:var(--cream-2); box-shadow:var(--shadow-s); }
+button{ font:inherit; color:inherit; border:0; background:none; cursor:pointer; }
+
+#app{ width:100%; max-width:480px; margin:0 auto; position:relative; min-height:100%; }
+
+/* ---------- 屏幕 ---------- */
+.screen{ display:none; }
+.screen.on{ display:block; animation:screenIn .5s var(--ease) both; }
+@keyframes screenIn{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:none;} }
+
+.wrap{ padding:0 22px; }
+.eyebrow{ font-size:11px; font-weight:800; letter-spacing:3px; color:var(--ink-3); }
+.card{ background:var(--card); border-radius:var(--r-card); box-shadow:var(--shadow); }
+.sec-title{ font-size:19.5px; font-weight:900; letter-spacing:-.2px; color:var(--ink); }
+.sec-sub{ font-size:13.5px; font-weight:600; color:var(--ink-2); margin-top:5px; line-height:1.72; }
+
+/* ---------- 按钮 ---------- */
+.btn{
+  display:flex; align-items:center; justify-content:center; gap:9px;
+  width:100%; min-height:56px; padding:0 24px; border-radius:999px;
+  background:var(--y); color:var(--ink); font-size:17px; font-weight:900; letter-spacing:.5px;
+  box-shadow:0 5px 0 var(--y-deep), var(--shadow-s);
+  transition:transform .16s var(--ease), box-shadow .16s var(--ease);
+}
+.btn:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--y-deep); }
+.btn.ghost{ background:#fff; box-shadow:0 5px 0 var(--line); }
+.btn.ghost:active{ box-shadow:0 1px 0 var(--line); }
+.btn .ic{ width:20px; height:20px; flex:0 0 auto; }
+.btn.lg{ min-height:62px; font-size:18px; }
+
+/* ---------- 开始页 ---------- */
+#start{ padding:26px 0 calc(34px + var(--safe-b)); }
+.brandbar{ display:flex; align-items:center; justify-content:space-between; padding:0 22px 4px; }
+.brand{ font-size:12px; font-weight:900; letter-spacing:1.2px; }
+.brand i{ color:var(--y-deep); font-style:normal; font-weight:800; }
+.pill{ font-size:10.5px; font-weight:800; color:var(--ink-2); background:#fff; border-radius:999px; padding:5px 11px; box-shadow:var(--shadow-s); }
+
+.hero{ position:relative; padding:8px 22px 0; }
+.hero-glow{ position:absolute; left:50%; top:-26px; width:330px; height:330px; transform:translateX(-50%);
+  background:radial-gradient(circle,rgba(78,143,107,.42),rgba(78,143,107,0) 66%); pointer-events:none; }
+#heroArt{ position:relative; width:206px; margin:0 auto; animation:bob 3.1s ease-in-out infinite; }
+@keyframes bob{ 0%,100%{ transform:translateY(0) rotate(-1.5deg);} 50%{ transform:translateY(-12px) rotate(1.5deg);} }
+#heroArt svg{ width:100%; height:auto; }
+
+h1.title{ font-size:35px; font-weight:900; letter-spacing:-.8px; line-height:1.26; text-align:center; margin-top:6px; }
+h1.title em{ font-style:normal; color:var(--y-deep); }
+.lede{ font-size:15px; font-weight:600; color:var(--ink-2); text-align:center; margin:14px auto 0; max-width:330px; line-height:1.92; }
+.lede b{ color:var(--ink); font-weight:900; }
+
+.statrow{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:24px; }
+.stat{ background:#fff; border-radius:var(--r-inner); padding:14px 8px; text-align:center; box-shadow:var(--shadow-s); }
+.stat b{ display:block; font-size:21px; font-weight:900; letter-spacing:-.6px; }
+.stat span{ font-size:11px; color:var(--ink-3); font-weight:700; }
+
+.cta-wrap{ padding:24px 22px 0; }
+.note{ font-size:11.5px; font-weight:600; color:var(--ink-3); text-align:center; margin-top:13px; line-height:1.8; }
+.proof{ font-size:12.5px; font-weight:700; color:var(--ink-2); text-align:center; margin-top:12px; }
+.proof b{ color:var(--ink); font-weight:900; }
+
+section.blk{ margin-top:36px; }
+.blk-head{ padding:0 22px 13px; }
+
+.roster{ display:grid; grid-template-columns:repeat(4,1fr); gap:9px; padding:0 22px; }
+.rcell{ background:#fff; border-radius:var(--r-inner); padding:8px 3px 7px; text-align:center; box-shadow:var(--shadow-s); }
+.rcell svg{ width:50px; height:50px; margin:0 auto; }
+.rcell .rn{ font-size:9.5px; font-weight:800; margin-top:3px; letter-spacing:-.3px; }
+
+/* 开始页的六维预览：不剧透结果，只告诉你会量什么 */
+.dims{ display:grid; grid-template-columns:1fr 1fr; gap:9px; padding:0 22px; }
+.dimcell{ background:#fff; border-radius:var(--r-inner); padding:13px 13px 12px; box-shadow:var(--shadow-s); }
+.dimcell .dn{ font-size:14.5px; font-weight:900; letter-spacing:-.2px; }
+.dimcell .dd{ font-size:12px; font-weight:600; color:var(--ink-2); margin-top:4px; line-height:1.65; }
+.dimcell .dt{ display:flex; align-items:center; margin-top:9px; }
+.dimcell .dt i{ flex:1; height:3px; border-radius:2px; background:var(--cream-2); position:relative; overflow:hidden; }
+.dimcell .dt i::after{ content:''; position:absolute; top:0; bottom:0; left:0; width:42%; background:var(--y); border-radius:2px; }
+
+.steps{ padding:0 22px; }
+.step{ display:flex; gap:13px; align-items:flex-start; padding:13px 0; border-bottom:1px dashed var(--line); }
+.step:last-child{ border-bottom:0; }
+.step .num{ flex:0 0 26px; height:26px; border-radius:50%; background:var(--y); font-size:12px; font-weight:900;
+  display:flex; align-items:center; justify-content:center; }
+.step .txt{ font-size:13.5px; color:var(--ink-2); line-height:1.7; }
+.step .txt b{ display:block; color:var(--ink); font-size:14.5px; font-weight:900; margin-bottom:1px; }
+
+/* ---------- 答题页 ---------- */
+#quiz{ padding:calc(20px + var(--safe-t)) 0 40px; }
+.qbar{ padding:0 22px; }
+.qbar-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; min-height:26px; }
+.qback{ display:flex; align-items:center; gap:3px; font-size:13px; font-weight:800; color:var(--ink-2); padding:4px 2px 4px 0; }
+.qback[hidden]{ display:none; }
+.qcount{ font-size:12.5px; font-weight:800; color:var(--ink-3); margin-left:auto; letter-spacing:.3px; }
+.qcount i{ color:var(--ink); font-style:normal; font-size:19px; font-weight:900; letter-spacing:-.5px; }
+.qcount u{ text-decoration:none; }
+.track{ height:8px; border-radius:99px; background:var(--cream-2); overflow:hidden; }
+.track i{ display:block; height:100%; width:0; border-radius:99px;
+  background:linear-gradient(90deg,var(--y),var(--y-deep)); transition:width .45s var(--ease); }
+
+.qbody{ padding:20px 22px 0; }
+/* 题干旁边的小家伙：随着答题进度换表情，做「它在陪你答」的感觉 */
+.qhead{ display:flex; align-items:flex-end; gap:12px; margin-bottom:14px; }
+.qmascot{ flex:0 0 76px; width:76px; height:76px; border-radius:24px; overflow:hidden;
+  background:var(--y-soft); box-shadow:var(--shadow-s); position:relative; }
+.qmascot svg, .qmascot img{ width:100%; height:100%; object-fit:contain; }
+/* 每换一题，它弹一下 */
+.qmascot.pop{ animation:qpop .5s var(--ease); }
+@keyframes qpop{ 0%{ transform:scale(1) rotate(0);} 30%{ transform:scale(1.14) rotate(-6deg);} 60%{ transform:scale(.96) rotate(3deg);} 100%{ transform:scale(1) rotate(0);} }
+.qspeech{ flex:1; position:relative; background:#fff; border-radius:18px 18px 18px 4px;
+  padding:12px 14px; box-shadow:var(--shadow-s); font-size:13px; font-weight:700;
+  color:var(--ink-2); line-height:1.6; min-height:44px; display:flex; align-items:center; }
+
+.qcard{ background:#fff; border-radius:var(--r-card); padding:20px 20px 18px;
+  box-shadow:0 10px 30px rgba(120,86,10,.09); position:relative; overflow:hidden; }
+.qcard::before{ content:''; position:absolute; top:0; left:0; right:0; height:4px;
+  background:linear-gradient(90deg,var(--y),#CDE4D4); }
+.qbadge{ display:flex; align-items:center; gap:7px; margin-bottom:10px; }
+.qnum{ font-size:11.5px; font-weight:900; color:#fff; background:var(--ink);
+  border-radius:8px; padding:3px 8px; letter-spacing:.5px; }
+.qlabel{ font-size:11px; font-weight:800; letter-spacing:2.5px; color:var(--ink-3); }
+.qtext{ font-size:22.5px; font-weight:900; line-height:1.5; letter-spacing:-.4px; color:var(--ink); }
+.opts{ margin-top:18px; }
+.opt{
+  display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  background:#fff; border:2px solid var(--line); border-radius:var(--r-inner);
+  padding:16px 16px; font-size:15.5px; font-weight:600; line-height:1.5; color:var(--ink);
+  transition:transform .14s var(--ease), border-color .14s, background .14s;
+}
+.opt:active{ transform:scale(.975); border-color:var(--y); background:var(--y-soft); }
+/* 入场动画放在外层，避免和按压的 transform 打架 */
+.opt-strip{ margin-bottom:11px; animation:optIn .5s var(--ease) both; animation-delay:var(--d,0ms); }
+.opt-strip:last-child{ margin-bottom:0; }
+@keyframes optIn{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:none;} }
+.opt .key{ flex:0 0 26px; height:26px; border-radius:50%; background:var(--cream-2); color:var(--ink-2);
+  font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center;
+  transition:background .14s, color .14s; }
+.opt.sel{ border-color:var(--y); background:var(--y-soft); }
+.opt.sel .key{ background:var(--y); color:var(--ink); }
+
+/* 进度点：18 个，答过的高亮 */
+.dots{ display:flex; gap:6px; padding:0 22px; margin-top:11px; }
+.dots i{ flex:1; height:6px; border-radius:99px; background:var(--cream-2); transition:background .3s var(--ease); }
+.dots i.done{ background:var(--y); }
+.dots i.now{ background:var(--y-deep); box-shadow:0 0 0 3px rgba(78,143,107,.32); }
+
+.qtip{ margin-top:16px; font-size:11.5px; font-weight:600; color:var(--ink-3); text-align:center; line-height:1.7; }
+
+/* ---------- 加载页 ---------- */
+#loading{ padding:0 22px; min-height:76vh; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+#loading.on{ display:flex; }
+#loadArt{ width:152px; animation:bob 1.9s ease-in-out infinite; }
+#loadArt svg{ width:100%; height:auto; }
+.ring{ width:150px; height:5px; border-radius:99px; background:var(--cream-2); overflow:hidden; margin-top:22px; }
+.ring i{ display:block; height:100%; width:0; background:var(--y-deep); border-radius:99px; transition:width .3s linear; }
+#loadText{ margin-top:14px; font-size:13px; color:var(--ink-2); font-weight:700; min-height:20px; }
+
+/* ---------- 结果页 ---------- */
+#result{ padding-bottom:calc(104px + var(--safe-b)); }
+.rail{ position:fixed; top:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; height:3px; z-index:60; }
+.rail i{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--y),var(--y-deep)); }
+
+/* 舞台高度 = 首屏滚动动画的时长。太短动画没播完内容就压上来，
+   太长会出现「图片停在那、下面还没内容」的空白段。
+   145vh 是实测下来「能看清首屏 + 动画播得完 + 不留空白」的平衡点。 */
+.stage{ position:relative; height:145vh; }
+.stage-inner{ position:sticky; top:0; height:100vh; height:100dvh; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; overflow:hidden; }
+.stage-glow{ position:absolute; left:50%; top:50%; width:430px; height:430px; transform:translate(-50%,-56%);
+  background:radial-gradient(circle,rgba(78,143,107,.48),rgba(78,143,107,0) 62%); will-change:transform; }
+.stage-art{ position:relative; width:230px; will-change:transform; }
+.stage-art svg{ width:100%; height:auto; }
+.stage-copy{ position:relative; text-align:center; padding:0 26px; will-change:transform,opacity; }
+.stage-tag{ font-size:11px; font-weight:800; letter-spacing:3.5px; color:var(--ink-3); }
+.stage-name{ font-size:38px; font-weight:900; letter-spacing:-1px; margin:6px 0 2px; line-height:1.22; }
+.stage-match{ font-size:13px; font-weight:800; color:var(--ink-2); }
+.stage-match b{ color:var(--y-deep); font-size:17px; }
+.scrollcue{ position:absolute; left:0; right:0; bottom:calc(26px + var(--safe-b));
+  display:flex; flex-direction:column; align-items:center; gap:9px; z-index:3; }
+.cue-text{ font-size:14px; font-weight:900; color:var(--ink); letter-spacing:.2px;
+  text-shadow:0 1px 0 rgba(255,247,232,.9), 0 0 14px rgba(255,247,232,.95), 0 0 26px rgba(255,247,232,.9); }
+.cue-pill{ display:flex; align-items:center; gap:6px; padding:7px 15px; border-radius:999px;
+  background:var(--y); box-shadow:0 5px 18px rgba(120,86,10,.22);
+  font-size:12.5px; font-weight:900; color:var(--ink); white-space:nowrap; }
+.cue-arrow{ display:flex; align-items:center; animation:nudge 1.6s ease-in-out infinite; }
+@keyframes nudge{ 0%,100%{ transform:translateY(-2px);} 50%{ transform:translateY(3px);} }
+/* 首屏底部压一层渐隐，暗示下面还有内容 */
+.stage-fade{ position:absolute; left:0; right:0; bottom:0; height:190px; pointer-events:none;
+  background:linear-gradient(rgba(255,247,232,0),rgba(255,247,232,.96)); z-index:2; }
+
+.flow{ position:relative; z-index:2; background:var(--cream); border-radius:32px 32px 0 0; margin-top:-34px; padding-top:32px; }
+.block{ padding:0 22px; margin-bottom:32px; }
+.verdict-card{ padding:22px 20px; }
+.vquote{ font-size:11px; color:var(--ink-3); font-weight:800; letter-spacing:2px; margin-bottom:9px; }
+.vtext{ font-size:17.5px; font-weight:800; line-height:1.8; letter-spacing:-.2px; }
+.second{ font-size:13px; color:var(--ink-2); line-height:1.85; padding:0 6px; }
+.second b{ color:var(--ink); font-weight:900; }
+
+.gap{ display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-top:14px; }
+.gcell{ background:#fff; border-radius:var(--r-inner); padding:15px 14px; box-shadow:var(--shadow-s); }
+.gcell .gl{ font-size:10.5px; color:var(--ink-3); font-weight:800; letter-spacing:.3px; }
+.gcell .gv{ font-size:15.5px; font-weight:900; margin-top:3px; }
+.gcell .gd{ font-size:11.5px; color:var(--ink-2); margin-top:3px; line-height:1.65; }
+
+.bars{ padding:20px 17px; }
+.bar{ display:flex; align-items:center; gap:10px; margin-bottom:13px; }
+.bar:last-child{ margin-bottom:0; }
+.bar .bl{ flex:0 0 66px; font-size:12px; font-weight:800; color:var(--ink-2); }
+.bar .bt{ flex:1; height:11px; border-radius:99px; background:var(--cream-2); overflow:hidden; }
+.bar .bt i{ display:block; height:100%; width:0; border-radius:99px; background:linear-gradient(90deg,var(--y),var(--y-deep)); }
+.bar .bv{ flex:0 0 34px; text-align:right; font-size:12.5px; font-weight:900; }
+
+.radar-card{ padding:12px 8px 4px; margin-top:14px; }
+.radar-card canvas{ width:100%; height:auto; }
+.dim-note{ display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; margin-top:14px; }
+.dim-note div{ font-size:11.5px; color:var(--ink-2); line-height:1.6; }
+.dim-note b{ color:var(--ink); }
+
+.read{ font-size:14.5px; line-height:2.05; color:#453B2C; margin-top:14px; }
+.read p{ margin-bottom:14px; }
+.read p:last-child{ margin-bottom:0; }
+
+.advice{ padding:20px 19px; background:linear-gradient(135deg,var(--y-soft),#DDEBE1); box-shadow:none; }
+.advice .at{ font-size:10.5px; font-weight:900; letter-spacing:2px; color:var(--ink-3); margin-bottom:8px; }
+.advice .ax{ font-size:15.5px; font-weight:800; line-height:1.8; }
+
+.relate{ display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-top:14px; }
+.rel{ background:#fff; border-radius:var(--r-inner); padding:15px 13px; box-shadow:var(--shadow-s); }
+.rel .rl{ font-size:10px; font-weight:900; letter-spacing:.5px; margin-bottom:7px; }
+.rel.a .rl{ color:var(--coral); } .rel.r .rl{ color:var(--ink-3); }
+.rel .rn{ font-size:14.5px; font-weight:900; margin-bottom:5px; }
+.rel .rd{ font-size:11.5px; color:var(--ink-2); line-height:1.65; }
+.rel .mini{ width:46px; height:46px; margin-top:9px; }
+.rel .mini svg{ width:100%; height:100%; }
+.chargenote{ margin-top:12px; font-size:12px; font-weight:600; color:var(--ink-2);
+  text-align:center; line-height:1.75; }
+
+.sharecard{ padding:24px 20px; text-align:center; }
+.sharecard .st{ font-size:16.5px; font-weight:900; }
+.sharecard .ss{ font-size:12.5px; color:var(--ink-2); margin-top:6px; line-height:1.75; }
+.wm{ font-size:11px; color:var(--ink-3); text-align:center; margin-top:16px; line-height:1.75; }
+
+.fab{ position:fixed; left:0; right:0; bottom:0; z-index:50; padding:12px 18px calc(12px + var(--safe-b));
+  background:linear-gradient(rgba(255,247,232,0),rgba(255,247,232,.95) 36%);
+  transform:translateY(135%); transition:transform .42s var(--ease); pointer-events:none; }
+.fab.on{ transform:none; pointer-events:auto; }
+.fab .inner{ max-width:444px; margin:0 auto; display:flex; gap:9px; }
+.fab .btn{ min-height:50px; font-size:15.5px; }
+.fab .btn.ghost{ flex:0 0 50px; padding:0; }
+
+/* 入场动画基类，由 JS 打开 */
+.rv{ opacity:0; transform:translateY(26px); transition:opacity .8s var(--ease), transform .8s var(--ease);
+  transition-delay:var(--d,0ms); will-change:opacity,transform; }
+.rv.in{ opacity:1; transform:none; }
+.rv.sc{ transform:translateY(26px) scale(.945); }
+.rv.sc.in{ transform:none; }
+.rv.l{ transform:translateX(-28px); } .rv.l.in{ transform:none; }
+.rv.r{ transform:translateX(28px); } .rv.r.in{ transform:none; }
+
+#toast{ position:fixed; left:50%; bottom:calc(86px + var(--safe-b)); transform:translate(-50%,14px);
+  background:rgba(34,29,23,.93); color:#fff; font-size:13px; font-weight:700; padding:11px 18px; border-radius:99px;
+  opacity:0; pointer-events:none; transition:opacity .3s, transform .3s; z-index:80; max-width:78vw; text-align:center; }
+#toast.on{ opacity:1; transform:translate(-50%,0); }
+
+/* ---------- 六维条：可点 ---------- */
+#barBox .bar{ cursor:pointer; border-radius:12px; padding:5px 6px; margin:0 -6px 8px;
+  transition:background .16s; }
+#barBox .bar:last-child{ margin-bottom:0; }
+#barBox .bar:active{ background:var(--y-soft); }
+#barBox .bar .bmore{ flex:0 0 auto; font-size:11px; color:var(--ink-3); font-weight:800; margin-left:2px; }
+
+.radar-hint{ position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
+  font-size:10.5px; color:var(--ink-3); font-weight:700; white-space:nowrap; }
+
+/* ---------- 8 只排名 ---------- */
+.rankcard{ padding:8px 6px; }
+.rk{ display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:14px; }
+.rk.me{ background:var(--y-soft); }
+.rk .rkart{ flex:0 0 40px; height:40px; border-radius:12px; overflow:hidden; background:var(--cream-2); }
+.rk .rkart svg, .rk .rkart img{ width:100%; height:100%; object-fit:cover; }
+.rk .rkname{ flex:0 0 92px; font-size:13px; font-weight:800; }
+.rk .rktrack{ flex:1; height:8px; border-radius:99px; background:var(--cream-2); overflow:hidden; }
+.rk .rktrack i{ display:block; height:100%; width:0; border-radius:99px; background:#D8CDB8; }
+.rk.me .rktrack i{ background:linear-gradient(90deg,var(--y),var(--y-deep)); }
+.rk .rkval{ flex:0 0 46px; text-align:right; font-size:12.5px; font-weight:900; }
+.rk.me .rkval{ color:var(--y-deep); }
+
+/* ---------- 探索入口 ---------- */
+.explore{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+.excard{ background:#fff; border-radius:var(--r-inner); padding:15px 14px; box-shadow:var(--shadow-s);
+  text-align:left; transition:transform .14s var(--ease); }
+.excard:active{ transform:scale(.975); }
+.excard .exi{ width:30px; height:30px; border-radius:10px; background:var(--y-soft); display:flex;
+  align-items:center; justify-content:center; margin-bottom:9px; }
+.excard .ext{ font-size:13.5px; font-weight:900; }
+.excard .exs{ font-size:11px; color:var(--ink-3); margin-top:3px; line-height:1.55; }
+
+/* ---------- 底部抽屉 ---------- */
+#scrim{ position:fixed; inset:0; background:rgba(34,29,23,.42); opacity:0; pointer-events:none;
+  transition:opacity .32s var(--ease); z-index:90; }
+#scrim.on{ opacity:1; pointer-events:auto; }
+#sheet{ position:fixed; left:0; right:0; bottom:0; z-index:91; transform:translateY(102%);
+  transition:transform .42s var(--ease); max-height:86vh; max-height:86dvh; }
+#sheet.on{ transform:none; }
+/* 抽屉打开时，把悬浮按钮和引导按钮收起来，免得叠在一起 */
+body.locked .fab{ transform:translateY(135%) !important; pointer-events:none !important; }
+body.locked #guide{ opacity:0 !important; pointer-events:none !important; }
+.sheet-inner{ max-width:480px; margin:0 auto; background:var(--cream);
+  border-radius:30px 30px 0 0; padding:10px 22px calc(26px + var(--safe-b));
+  max-height:86vh; max-height:86dvh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain; box-shadow:0 -12px 44px rgba(80,56,6,.22); }
+.sheet-grip{ width:42px; height:4.5px; border-radius:99px; background:var(--line); margin:4px auto 14px; }
+.sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.sheet-title{ font-size:19px; font-weight:900; }
+.sheet-close{ width:32px; height:32px; border-radius:50%; background:#fff; display:flex;
+  align-items:center; justify-content:center; box-shadow:var(--shadow-s); color:var(--ink-2); }
+.sheet-body{ font-size:14px; line-height:1.9; color:#453B2C; }
+.sheet-body .sc-hero{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+.sheet-body .sc-hero .big{ font-size:44px; font-weight:900; letter-spacing:-2px; line-height:1; }
+.sheet-body .sc-hero .unit{ font-size:13px; color:var(--ink-3); font-weight:800; }
+.sheet-body .sc-hero .art{ width:64px; height:64px; border-radius:18px; overflow:hidden; flex:0 0 auto; }
+.sheet-body .sc-hero .art svg, .sheet-body .sc-hero .art img{ width:100%; height:100%; object-fit:cover; }
+.sc-scale{ margin:6px 0 18px; }
+.sc-scale .sc-track{ height:12px; border-radius:99px; background:#fff; overflow:hidden; position:relative;
+  box-shadow:inset 0 0 0 1px var(--line); }
+.sc-scale .sc-fill{ height:100%; border-radius:99px; background:linear-gradient(90deg,var(--y),var(--y-deep));
+  width:0; transition:width .6s var(--ease); }
+.sc-scale .sc-mark{ position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink-3); opacity:.5; }
+.sc-scale .sc-lbl{ display:flex; justify-content:space-between; font-size:10.5px; color:var(--ink-3);
+  font-weight:700; margin-top:6px; }
+.sc-row{ display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed var(--line); font-size:13px; }
+.sc-row:last-child{ border-bottom:0; }
+.sc-row b{ font-weight:900; }
+.sc-note{ background:#fff; border-radius:var(--r-inner); padding:14px 15px; margin-top:14px;
+  font-size:13px; line-height:1.85; box-shadow:var(--shadow-s); }
+
+/* ---------- 引导按钮 ---------- */
+/* 引导按钮：固定在手机内容栏的右下角（宽屏时跟着内容栏） */
+/* 引导按钮：做成很小一颗（34px）蹲在右下角。
+   单列窄屏卡片是通栏的，大一点就一定会压到正文，所以这里刻意做小。 */
+#guide{ position:fixed; right:12px; bottom:calc(88px + var(--safe-b)); z-index:70;
+  width:34px; padding:0; display:flex; flex-direction:column; align-items:center;
+  opacity:0; transform:translateY(8px) scale(.82); pointer-events:none;
+  transition:opacity .28s var(--ease), transform .28s var(--ease); }
+@media (min-width:508px){ #guide{ right:calc(50% - 240px + 12px); } }
+#guide.on{ opacity:1; transform:none; pointer-events:auto; }
+#guide.off{ display:none; }
+/* 点它：先弹一下，然后整只蹦到别的地方再淡出 */
+#guide.hop{ pointer-events:none; }
+#guide.hop .guide-tap{ transition:transform .46s cubic-bezier(.34,1.4,.5,1), opacity .46s ease; }
+.guide-tap{ width:100%; display:flex; flex-direction:column; align-items:center; padding:0; }
+.guide-x{ position:absolute; top:-7px; right:-7px; width:17px; height:17px; border-radius:50%;
+  background:rgba(31,27,21,.58); color:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:900; line-height:1; z-index:2; }
+#guide .guide-art{ width:34px; height:34px; border-radius:50%; background:#fff; overflow:hidden;
+  box-shadow:0 5px 16px rgba(120,86,10,.26), inset 0 0 0 2px var(--y);
+  animation:guideBob 2.4s ease-in-out infinite; }
+#guide .guide-art svg, #guide .guide-art img{ width:100%; height:100%; object-fit:cover; }
+@keyframes guideBob{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-5px);} }
+.guide-tap:active .guide-art{ animation:none; transform:scale(.9); }
+/* 贱话做成贴在按钮上方的小气泡，不占按钮高度 */
+#guide .guide-tail{ position:absolute; bottom:calc(100% + 5px); right:0;
+  font-size:10px; font-weight:900; color:var(--ink);
+  background:rgba(255,255,255,.96); border-radius:99px; padding:3px 7px; box-shadow:var(--shadow-s);
+  white-space:nowrap; }
+/* 点下去的时候整只弹一下 */
+#guide.pop .guide-art{ animation:pop .52s var(--ease); }
+@keyframes pop{ 0%{ transform:scale(1);} 30%{ transform:scale(1.28) rotate(-8deg);} 55%{ transform:scale(.9) rotate(5deg);} 100%{ transform:scale(1);} }
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important;
+    transition-duration:.001ms !important; }
+  .rv{ opacity:1 !important; transform:none !important; }
+  .opt{ opacity:1 !important; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= 开始页 ================= -->
+  <div id="start" class="screen on">
+    <div class="brandbar">
+      <div class="brand">社交电量测试 <i>SOCIAL BATTERY</i></div>
+      <div class="pill">六维模型 · 18 题</div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-glow"></div>
+      <div id="heroArt" style="--d:0ms"></div>
+    </div>
+
+    <h1 class="title">你看起来还有电<br>但你的电<em>还剩几格</em>？</h1>
+    <p class="lede">18 道题，测你的电<b>耗在哪</b>、<br>又<b>靠什么充回来</b>，以及谁在偷偷耗你。</p>
+
+    <div class="wrap">
+      <div class="statrow">
+        <div class="stat"><b id="statN">18</b><span>道情境题</span></div>
+        <div class="stat"><b>6</b><span>个人格维度</span></div>
+        <div class="stat"><b>90</b><span>秒出电量报告</span></div>
+      </div>
+    </div>
+
+    <div class="cta-wrap">
+      <button class="btn lg" id="startBtn">
+        <span>开始测试</span>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+      </button>
+      <p class="proof">平均测试用时 <b>88 秒</b></p>
+    </div>
+
+    <section class="blk">
+      <div class="blk-head">
+        <div class="sec-title">你会被测到什么</div>
+        <div class="sec-sub">六个维度一起算，不是给你贴个标签</div>
+      </div>
+      <div class="dims" id="dimTease"></div>
+    </section>
+
+    <section class="blk">
+      <div class="blk-head">
+        <div class="sec-title">测完你会拿到什么</div>
+        <div class="sec-sub">一份可以保存发出去的六维报告</div>
+      </div>
+      <div class="steps">
+        <div class="step"><div class="num">1</div><div class="txt"><b>一个结果</b>系统把你的六维画像和所有可能的画像逐一比对，最像你的那一个才成为结果，并给出匹配度。</div></div>
+        <div class="step"><div class="num">2</div><div class="txt"><b>六维雷达与分值</b>每一维都给出分值、你在人群里的位置，以及它到底意味着什么。</div></div>
+        <div class="step"><div class="num">3</div><div class="txt"><b>关系磁场</b>按你的分数算出谁跟你最合、谁跟你最冲，不是写死的配对。</div></div>
+        <div class="step"><div class="num">4</div><div class="txt"><b>一张结果海报</b>含雷达图、匹配度、稀有度和关系磁场，长按保存就能发小红书。</div></div>
+      </div>
+    </section>
+
+    <div class="cta-wrap">
+      <p class="note">本测试为娱乐性质 · 不构成任何专业心理诊断<br>测同款 → 小红书 @Stanley</p>
+    </div>
+  </div>
+
+  <!-- ================= 答题页 ================= -->
+  <div id="quiz" class="screen">
+    <div class="qbar">
+      <div class="qbar-top">
+        <button class="qback" id="qBack" hidden>
+          <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+          上一题
+        </button>
+        <div class="qcount"><i id="qNow">1</i><u> / 18</u></div>
+      </div>
+      <div class="dots" id="qDots"></div>
+    </div>
+    <div class="qbody">
+      <div class="qhead">
+        <div class="qmascot" id="qMascot"></div>
+        <div class="qspeech" id="qSpeech">不用想太多，第一反应最像你</div>
+      </div>
+      <div class="qcard">
+        <div class="qbadge">
+          <span class="qnum" id="qNum">Q1</span>
+          <span class="qlabel" id="qLabel">凭直觉选</span>
+        </div>
+        <div class="qtext" id="qText"></div>
+      </div>
+      <div class="opts" id="opts"></div>
+      <p class="qtip">18 题 · 没有正确答案，凭第一反应选就好</p>
+    </div>
+  </div>
+
+  <!-- ================= 加载页 ================= -->
+  <div id="loading" class="screen">
+    <div id="loadArt"></div>
+    <div class="ring"><i id="loadBar"></i></div>
+    <p id="loadText">正在分析你的星盘…</p>
+  </div>
+
+  <!-- ================= 结果页 ================= -->
+  <div id="result" class="screen">
+    <div class="rail"><i id="rail"></i></div>
+
+    <div class="stage" id="stage">
+      <div class="stage-inner">
+        <div class="stage-glow" id="stageGlow"></div>
+        <div class="stage-art" id="stageArt"></div>
+        <div class="stage-copy" id="stageCopy">
+          <div class="stage-tag">YOUR BATTERY</div>
+          <div class="stage-name" id="rName"></div>
+          <div class="stage-match">匹配度 <b id="rMatch">—</b> · 稀有度 <span id="rRare">—</span></div>        </div>
+        <div class="stage-fade"></div>
+        <div class="scrollcue" id="cue">
+          <div class="cue-text">向下滑，看你的六维报告</div>
+          <div class="cue-pill">
+            继续
+            <span class="cue-arrow">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F1B15" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow">
+      <div class="block">
+        <div class="card verdict-card rv sc">
+          <div class="vquote">定 性 判 决</div>
+          <div class="vtext" id="rVerdict"></div>
+        </div>
+      </div>
+
+      <div class="block" style="margin-top:-14px">
+        <div class="second rv" style="--d:80ms" id="rSecond"></div>
+      </div>
+
+      <div class="block">
+        <div class="sec-title rv">你在人群里的位置</div>
+        <div class="sec-sub rv" style="--d:60ms">拿你最突出的那一项，和其它测试者比</div>
+        <div class="gap">
+          <div class="gcell rv l" style="--d:120ms">
+            <div class="gl">最突出 · <span id="gTopName"></span></div>
+            <div class="gv" id="gTopVal"></div>
+            <div class="gd" id="gTopDesc"></div>
+          </div>
+          <div class="gcell rv r" style="--d:180ms">
+            <div class="gl">最弱的一项 · <span id="gLowName"></span></div>
+            <div class="gv" id="gLowVal"></div>
+            <div class="gd" id="gLowDesc"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="sec-title rv">你的六维报告</div>
+        <div class="sec-sub rv" style="--d:60ms">点任意一条，看你这一维到底是什么意思</div>
+        <div class="card bars rv" id="barBox" style="margin-top:14px"></div>
+      </div>
+
+      <div class="block">
+        <div class="sec-title rv">六维能量雷达</div>
+        <div class="sec-sub rv" style="--d:60ms">面积越大，你越不好惹、也越有能量</div>
+        <div class="card radar-card rv sc" style="--d:120ms;position:relative">
+          <canvas id="radar" width="740" height="660"></canvas>
+          <div class="radar-hint">点雷达上的顶点，看那一维的解读</div>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="sec-title rv">你也是这 8 只里的一只</div>
+        <div class="sec-sub rv" style="--d:60ms">按你的六维画像和每一只逐一比对，条越长越像</div>
+        <div class="card rankcard rv" id="rankCard" style="--d:120ms"></div>
+      </div>
+
+      <div class="block">
+        <div class="sec-title rv">为什么会是你</div>
+        <div class="sec-sub rv" style="--d:60ms">读完这段，你大概会安静三秒</div>
+        <div class="read rv" id="rDesc" style="--d:120ms"></div>
+      </div>
+
+      <div class="block">
+        <div class="card advice rv">
+          <div class="at">给 你 的 一 句 话</div>
+          <div class="ax" id="rAdvice"></div>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="sec-title rv">谁在耗你的电</div>
+        <div class="sec-sub rv" style="--d:60ms">不是写死的配对，是按你的六维分数算出来的</div>
+        <div class="relate">
+          <div class="rel r rv l" style="--d:120ms">
+            <div class="rl">最 耗 你 电</div>
+            <div class="rn" id="rRepel"></div>
+            <div class="rd" id="rRepelDesc"></div>
+            <div class="mini" id="rpMini"></div>
+          </div>
+          <div class="rel a rv r" style="--d:180ms">
+            <div class="rl">给 你 充 电</div>
+            <div class="rn" id="rAttract"></div>
+            <div class="rd" id="rAttractDesc"></div>
+            <div class="mini" id="atMini"></div>
+          </div>
+        </div>
+        <div class="chargenote rv" style="--d:240ms">
+          把这张截图发给那个你想到的人——他大概就是上面那一个。
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="card sharecard rv sc">
+          <div id="shareArt" style="width:86px;margin:0 auto 12px"></div>
+          <div class="st">把这份电量报告发出去</div>
+          <div class="ss">生成一张结果海报，含你的六维雷达、匹配度和稀有度<br>长按保存 → 发小红书 / 朋友圈</div>
+          <button class="btn" id="saveBtn" style="margin-top:16px">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 20h14"/></svg>
+            保存结果海报
+          </button>
+          <button class="btn ghost" id="againBtn" style="margin-top:10px">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 2.6 5.9M4 20v-5h5"/></svg>
+            重新测一次
+          </button>
+        </div>
+        <p class="wm">测同款 → 小红书 @Stanley<br>本测试为娱乐性质，不构成心理诊断</p>
+      </div>
+    </div>
+
+    <div class="fab" id="fab">
+      <div class="inner">
+        <button class="btn ghost" id="fabTop" aria-label="回到顶部">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6 12l6-6 6 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="scrim"></div>
+  <div id="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-inner">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head">
+        <span class="sheet-title" id="sheetTitle">—</span>
+        <button class="sheet-close" id="sheetClose" aria-label="关闭">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body" id="sheetBody"></div>
+    </div>
+  </div>
+  <div id="guide" hidden></div>
+</div>
+
+<script src="dino_art.js"></script>
+<script src="engine.js"></script>
+<script>
+/* 形象优先用 dino_real.js 里的卡皮巴拉插画（已抠成透明底），
+   加载失败（文件不存在 / 读取报错）就直接退回 dino_art.js 的矢量形象。
+   这里不能用 XHR/fetch 探测：页面用 file:// 打开时会被 CORS 拦掉，
+   所以用 script 标签 + onerror 兜底。 */
+(function () {
+  var done = false;
+  function loadApp() {
+    if (done) return;
+    done = true;
+    var s = document.createElement('script');
+    s.src = 'app.js';
+    document.body.appendChild(s);
+  }
+  var real = document.createElement('script');
+  real.src = 'dino_real.js';
+  real.onload = loadApp;
+  real.onerror = loadApp;   // 素材不存在时也要让页面跑起来
+  document.body.appendChild(real);
+})();
+</script>
+</body>
+</html>
