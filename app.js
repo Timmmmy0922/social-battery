@@ -18,6 +18,7 @@
     answers: new Array(E.QUESTIONS.length).fill(null),  // 每题的选项下标
     result: null,
     poster: null,
+    profile: null,   // 开场问答收集的性别/年龄段
   };
 
   /* ---------------- 工具 ---------------- */
@@ -116,6 +117,48 @@
         box.appendChild(cell);
       });
     }
+  }
+
+  /* ---------------- 开场问答：性别 / 年龄段 ----------------
+     为什么要问：结果里有百分位比较（「排在前 X%」），
+     不收集就没法说清楚是「跟谁比」——之前那句「同龄人」是编的。
+     两项都必选，选完才能进答题页。 */
+  const PROFILE = { gender: null, age: null };
+
+  function openIntro() {
+    closeSheet();
+    // 小角色陪一下，随机换个表情免得每次都一样
+    const art = $('introArt');
+    if (art) art.innerHTML = anyDino(['chill', 'fake', 'yum', 'laugh'][state.qi % 4] || 'chill', 96);
+    syncIntro();
+    show('intro');
+    window.scrollTo(0, 0);
+  }
+
+  function syncIntro() {
+    const g = $('chipsGender'), a = $('chipsAge'), btn = $('introNext'), hint = $('introHint');
+    if (g) [].forEach.call(g.children, (c) => c.classList.toggle('on', c.dataset.v === PROFILE.gender));
+    if (a) [].forEach.call(a.children, (c) => c.classList.toggle('on', c.dataset.v === PROFILE.age));
+    const ready = !!(PROFILE.gender && PROFILE.age);
+    if (btn) btn.disabled = !ready;
+    if (hint) hint.textContent = ready ? '好了，开始吧' : '两项都选一下就能开始';
+  }
+
+  function bindIntro() {
+    const g = $('chipsGender'), a = $('chipsAge');
+    if (g) [].forEach.call(g.children, (c) => {
+      c.onclick = () => { PROFILE.gender = c.dataset.v; syncIntro(); };
+    });
+    if (a) [].forEach.call(a.children, (c) => {
+      c.onclick = () => { PROFILE.age = c.dataset.v; syncIntro(); };
+    });
+    const btn = $('introNext');
+    if (btn) btn.onclick = () => {
+      if (!PROFILE.gender || !PROFILE.age) return;
+      state.profile = { gender: PROFILE.gender, age: PROFILE.age,
+        ageLabel: (E.AGE_LABELS && E.AGE_LABELS[PROFILE.age]) || '' };
+      startQuiz();
+    };
   }
 
   /* ---------------- 答题页 ---------------- */
@@ -255,7 +298,7 @@
 
   /* ---------------- 结果页 ---------------- */
   function showResult() {
-    const r = E.rank(rawScores());
+    const r = E.rank(rawScores(), state.profile);
     const p = E.personal(r);
     state.result = r;
     state.personal = p;
@@ -372,8 +415,7 @@
       </div>
       <div class="sc-note">${zh.meaning || ''}</div>
       <div class="sc-row"><span>你这一维的分数</span><b>${v}</b></div>
-      <div class="sc-row"><span>同龄人中间值</span><b>50</b></div>
-      <div class="sc-row"><span>人群位置</span><b>前 ${Math.max(1, 100 - pct)}%</b></div>
+      <div class="sc-row"><span>${(E.AGE_LABELS && E.AGE_LABELS[(r.profile || {}).age]) || '所有测过的人'}中的位置</span><b>前 ${Math.max(1, 100 - pct)}%</b></div>
       <div class="sc-note">${E.describe(d, v)}</div>
       ${zh.advice ? `<div class="sc-note">${zh.advice}</div>` : ''}
     `);
@@ -1044,7 +1086,8 @@
 
   /* ---------------- 事件绑定 ---------------- */
   function bind() {
-    $('startBtn').onclick = startQuiz;
+    bindIntro();
+    $('startBtn').onclick = openIntro;
     $('qBack').onclick = goBack;
     $('againBtn').onclick = () => { show('start'); window.scrollTo(0, 0); };
     $('saveBtn').onclick = savePoster;
@@ -1130,9 +1173,15 @@
     const m = q.match(/demo=([a-z0-9-]+)/);
     if (!m) return;
     const mode = m[1];
-    if (mode === 'quiz') {
+    if (mode === 'intro') {
+      // 停在开场问答页（截图 / 联调用）
+      PROFILE.gender = 'f';
+      openIntro();
+    } else if (mode === 'quiz') {
+      state.profile = { gender: 'f', age: '23' };   // demo 也给个默认画像，免得对照句没数据
       startQuiz();
     } else if (mode === 'result' || E.ARCH[mode]) {
+      if (!state.profile) state.profile = { gender: 'f', age: '23' };
       // ?demo=result 或 ?demo=<某只的key>：自动答题，指定 key 时按那只的画像方向选
       const target = E.ARCH[mode] ? mode : null;
       const u = target ? E.unitVector(E.ARCH[target]) : null;

@@ -375,7 +375,7 @@
 
   /* 排名：投影分最高的成为结果；同时返回全部 8 个的匹配度与份额。
      第二像的那个用于「还有百分之多少的你是 XX」——这是定制感的来源。 */
-  function rank(rawScores) {
+  function rank(rawScores, profile) {
     const normed = normScores(rawScores);
     const z = zProfile(normed);
     const fits = {};
@@ -400,6 +400,7 @@
       match: matches[top],
       secondMatch: matches[second],
       scores: normed,
+      profile: profile || null,
       fits: fits,
       matches: matches,
       order: order,
@@ -449,9 +450,12 @@
     const t1 = top3[0], t2 = top3[1], l1 = low3[0];
 
     // 判决前加一句完全按你的分数生成的引子
+    const pr = r.profile || {};
+    // 百分位是按全体样本算的（没有分年龄标定，不能假装有），
+    // 所以主句统一说「所有测过的人」，再用第二句把年龄段交代出来。
     const lead = `你的${DIM_LABELS[t1]}打到了 ${s[t1]}，${DIM_LABELS[t2]}也有 ${s[t2]}，` +
-      `而${DIM_LABELS[l1]}只剩 ${s[l1]}——放在同一批人里，你的${DIM_LABELS[t1]}排在前 ${100 - percentile(t1, s[t1])}%，` +
-      `属于很不典型的那一类。`;
+      `而${DIM_LABELS[l1]}只剩 ${s[l1]}。在所有测过的人里，你的${DIM_LABELS[t1]}排在前 ${100 - percentile(t1, s[t1])}%，` +
+      `属于很不典型的那一类${pr.ageLabel ? `；你选的年龄段是 ${pr.ageLabel}` : ''}。`;
 
     // 稀有度：基础占比 × 你有多极端（越极端越稀有）
     const extremeness = Math.max(...DIMS.map((d) => Math.abs((s[d] - CALIB[d][0]) / CALIB[d][1]))) / 2.6;
@@ -468,15 +472,21 @@
   function describe(dim, val) {
     const [lo, hi] = DIM_POLES[dim];
     const p = percentile(dim, val);
-    if (p >= 72) return `${hi}。这个分数在同龄人里排前 ${100 - p}%。`;
-    if (p <= 28) return `${lo}。这个分数比你身边大多数人都低。`;
+    if (p >= 72) return `${hi}。这个分数在所有测过的人里排前 ${100 - p}%。`;
+    if (p <= 28) return `${lo}。这个分数比大多数测过的人都低。`;
     return `中间偏${val >= CALIB[dim][0] ? '上' : '下'}，${val >= 50 ? '偶尔' : '大多数时候不会'}让这一项主导你的选择。`;
   }
+
+  // 年龄段与性别的中文名（开场问答收集，用于结果里的对照说明）
+  const AGE_LABELS = { u18: '18 岁以下', '18': '18–22 岁', '23': '23–27 岁',
+    '28': '28–35 岁', '36': '36 岁以上' };
+  const GENDER_LABELS = { f: '女生', m: '男生', x: '不填' };
 
   root.ENGINE = {
     DIMS, DIM_LABELS, DIM_POLES, DESCRIBE, QUESTIONS, ARCH, RESULTS, BASE_SHARE,
     normScores, rank, personal, percentile, describe, matchPct, unitVector, sharesOf,
     relationPair,
+    AGE_LABELS, GENDER_LABELS,
     DINO_COUNT: Object.keys(ARCH).length,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

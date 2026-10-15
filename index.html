@@ -372,7 +372,25 @@ body.locked #guide{ opacity:0 !important; pointer-events:none !important; }
 .sc-note{ background:#fff; border-radius:var(--r-inner); padding:14px 15px; margin-top:14px;
   font-size:13px; line-height:1.85; box-shadow:var(--shadow-s); }
 
-/* ---------- 引导按钮 ---------- */
+/* ---------- 开场问答（性别 / 年龄段）---------- */
+.intro-wrap{ min-height:100vh; min-height:100dvh; display:flex; flex-direction:column;
+  justify-content:center; padding:var(--safe-t) 22px calc(20px + var(--safe-b)); }
+.intro-art{ width:96px; height:96px; margin:0 auto 4px; }
+.intro-art svg,.intro-art img{ width:100%; height:100%; object-fit:contain; }
+.intro-speech{ text-align:center; font-size:13.5px; font-weight:700; color:var(--ink-2);
+  margin:0 auto 26px; max-width:250px; line-height:1.7; }
+.intro-q{ margin-bottom:20px; }
+.intro-label{ font-size:13px; font-weight:800; color:var(--ink-3); letter-spacing:.06em;
+  margin-bottom:10px; }
+.chips{ display:flex; flex-wrap:wrap; gap:9px; }
+.chip{ appearance:none; border:2px solid var(--line); background:#fff; color:var(--ink);
+  font:inherit; font-size:14.5px; font-weight:700; padding:11px 17px; border-radius:999px;
+  cursor:pointer; transition:transform .16s, background .16s, border-color .16s, color .16s; }
+.chip:active{ transform:scale(.95); }
+.chip.on{ background:var(--y); border-color:var(--y-deep); color:#fff; }
+.intro-wrap .cta-wrap{ margin-top:8px; }
+
+
 /* 引导按钮：固定在手机内容栏的右下角（宽屏时跟着内容栏） */
 /* 引导按钮：做成很小一颗（34px）蹲在右下角。
    单列窄屏卡片是通栏的，大一点就一定会压到正文，所以这里刻意做小。 */
@@ -470,6 +488,42 @@ body.locked #guide{ opacity:0 !important; pointer-events:none !important; }
 
     <div class="cta-wrap">
       <p class="note">本测试为娱乐性质 · 不构成任何专业心理诊断<br>测同款 → 小红书 @Stanley</p>
+    </div>
+  </div>
+
+  <!-- ================= 开场问答（性别 / 年龄段）================= -->
+  <div id="intro" class="screen">
+    <div class="intro-wrap">
+      <div class="intro-art" id="introArt"></div>
+      <div class="intro-speech" id="introSpeech">先问两句，好让结果跟你对得上</div>
+
+      <div class="intro-q">
+        <div class="intro-label">你是</div>
+        <div class="chips" id="chipsGender">
+          <button class="chip" data-v="f">女生</button>
+          <button class="chip" data-v="m">男生</button>
+          <button class="chip" data-v="x">不填</button>
+        </div>
+      </div>
+
+      <div class="intro-q">
+        <div class="intro-label">年龄段</div>
+        <div class="chips" id="chipsAge">
+          <button class="chip" data-v="u18">18 以下</button>
+          <button class="chip" data-v="18">18–22</button>
+          <button class="chip" data-v="23">23–27</button>
+          <button class="chip" data-v="28">28–35</button>
+          <button class="chip" data-v="36">36 以上</button>
+        </div>
+      </div>
+
+      <div class="cta-wrap">
+        <button class="btn lg" id="introNext" disabled>
+          <span>下一步</span>
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </button>
+        <p class="proof" id="introHint">两项都选一下就能开始</p>
+      </div>
     </div>
   </div>
 
