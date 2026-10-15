@@ -949,118 +949,160 @@
     ctx.textBaseline = 'alphabetic';
   }
 
+  /* ---------------- 结果海报 ----------------
+     设计目标：让用户「一转发就自带社交属性」。
+     做法：
+      1. 顶部品牌条永远可见（转发出去别人知道这是哪测的）
+      2. 一只巨大的电量数字 + 一句定性判决，截图时最抓眼
+      3. 结果名是主角，配「稀有度」造稀缺感
+      4. 底部把「谁耗你电 / 给你充电」印上去 —— 这是拿去 @ 别人的钩子
+      5. 尺寸固定 750×1334（正好是 9:16 手机竖图），朋友圈/小红书不会被裁
+     注意：文字高度全部用「实测」而不是估算，否则会重叠。 */
   async function buildPoster() {
     const r = state.result, p = state.personal;
     const res = E.RESULTS[r.key];
-    const W = 750;
-    // 先用一次离屏测量算出内容总高，避免写死坐标导致溢出或留白
-    const H = posterHeight(r, p, res);
+    const W = 750, PAD = 46, CW = W - PAD * 2;
     const c = document.createElement('canvas');
-    c.width = W; c.height = H;
-    const ctx = c.getContext('2d');
+    const ctx0 = c.getContext('2d');
     const F = (w, s) => `${w} ${s}px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif`;
 
-    // 背景
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#EAF3EC'); g.addColorStop(0.4, '#FBF7F0'); g.addColorStop(1, '#F0EDE4');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    const rg = ctx.createRadialGradient(W / 2, 200, 20, W / 2, 200, 350);
-    rg.addColorStop(0, 'rgba(78,143,107,.5)'); rg.addColorStop(1, 'rgba(78,143,107,0)');
-    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, 620);
+    // ---- 先把要画的文字全部换成行，算准总高 ----
+    const verdictLines = wrapLines(ctx0, res.verdict, F(700, 27), CW - 64);
+    const leadLines = wrapLines(ctx0, p.lead, F(600, 22), CW - 64);
+    const LINE_V = 40, LINE_L = 34;
 
+    // 分区高度
+    const H_BRAND = 96;
+    const H_NAME = 150;
+    const H_CARD_V = 74 + verdictLines.length * LINE_V + 26;
+    const H_LEAD = leadLines.length * LINE_L + 34;
+    const H_RADAR = 356;
+    const H_BARS = 62 + E.DIMS.length * 31;
+    const H_REL = 196;
+    const H_FOOT = 92;
+    const H = H_BRAND + 22 + 300 + 20 + H_NAME + 22 + H_CARD_V + 16 + H_LEAD + 16
+      + H_RADAR + 16 + H_BARS + 16 + H_REL + H_FOOT;
+    c.width = W; c.height = H;
+
+    const ctx = c.getContext('2d');
     let y = 0;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#A08F70';
-    ctx.font = F(800, 20);
-    ctx.fillText('社交电量测试 · 你的电还剩几格', W / 2, (y = 62));
 
-    // 形象
+    // ---- 底色 ----
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#F2F7F2'); g.addColorStop(0.45, '#FBF7F0'); g.addColorStop(1, '#F1EDE4');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const rg = ctx.createRadialGradient(W / 2, 300, 30, W / 2, 300, 420);
+    rg.addColorStop(0, 'rgba(78,143,107,.42)'); rg.addColorStop(1, 'rgba(78,143,107,0)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, 760);
+
+    // ---- 顶部品牌条（转发出去别人知道是哪测的）----
+    ctx.fillStyle = '#4E8F6B'; ctx.fillRect(0, 0, W, H_BRAND);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff'; ctx.font = F(900, 30);
+    ctx.fillText('社交电量测试', W / 2, H_BRAND / 2 - 12);
+    ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.font = F(800, 17);
+    ctx.fillText('SOCIAL BATTERY TEST · 你的电还剩几格', W / 2, H_BRAND / 2 + 18);
+    y = H_BRAND + 22;
+
+    // ---- 形象 ----
     try {
       const img = await loadDinoImage(r.key, 400);
-      const size = 256, x = W / 2 - size / 2, yy = 90;
-      ctx.save(); rr(ctx, x, yy, size, size, 46); ctx.clip();
-      ctx.drawImage(img, x, yy, size, size); ctx.restore();
+      const size = 300, x = W / 2 - size / 2;
+      ctx.save(); rr(ctx, x, y, size, size, 52); ctx.clip();
+      ctx.drawImage(img, x, y, size, size); ctx.restore();
     } catch (e) { /* 图出不来也不影响其余内容 */ }
-    y = 392;
+    y += 300 + 20;
 
-    // 名字 / 数据
-    ctx.fillStyle = '#221D17'; ctx.font = F(900, 58);
-    ctx.fillText(res.name, W / 2, (y += 46));
-    ctx.fillStyle = '#6B5B45'; ctx.font = F(800, 23);
-    ctx.fillText(`匹配度 ${r.match}%   ·   稀有度 ${p.rarity}%`, W / 2, (y += 40));
-    ctx.fillStyle = '#A08F70'; ctx.font = F(700, 19);
-    ctx.fillText(`100 个人里大约只有 ${Math.max(1, Math.round(p.rarity))} 个是这只`, W / 2, (y += 28));
+    // ---- 结果名（主角）+ 稀有度 ----
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#221D17'; ctx.font = F(900, 76);
+    ctx.fillText(res.name, W / 2, y + 62);
+    ctx.fillStyle = '#4E8F6B'; ctx.font = F(900, 30);
+    ctx.fillText(`${r.match}% 匹配`, W / 2, y + 112);
+    ctx.fillStyle = '#A08F70'; ctx.font = F(700, 20);
+    ctx.fillText(`100 个人里只有 ${p.rarity} 个是这种`, W / 2, y + 144);
+    y += H_NAME + 22;
 
-    // 判决卡（高度按文字长度算）
-    const vLines = measureLines(ctx, '「' + res.verdict + '」', F(800, 25), W - 156);
-    const cardH = 62 + vLines * 38;
-    y += 34;
-    ctx.fillStyle = '#fff'; rr(ctx, 48, y, W - 96, cardH, 30); ctx.fill();
+    // ---- 判决卡 ----
+    ctx.fillStyle = '#fff'; rr(ctx, PAD, y, CW, H_CARD_V, 32); ctx.fill();
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#A08F70'; ctx.font = F(800, 17);
-    ctx.fillText('定 性 判 决', 78, y + 40);
-    ctx.fillStyle = '#221D17'; ctx.font = F(800, 25);
-    wrapText(ctx, '「' + res.verdict + '」', 78, y + 78, W - 156, 38);
-    y += cardH + 26;
+    ctx.fillStyle = '#4E8F6B'; ctx.font = F(900, 18);
+    ctx.fillText('定 性 判 决', PAD + 32, y + 42);
+    ctx.fillStyle = '#221D17'; ctx.font = F(700, 27);
+    verdictLines.forEach((ln, i) => ctx.fillText(ln, PAD + 32, y + 74 + 24 + i * LINE_V));
+    y += H_CARD_V + 16;
 
-    // 雷达卡
-    const radarH = 372;
-    ctx.fillStyle = '#fff'; rr(ctx, 48, y, W - 96, radarH, 30); ctx.fill();
+    // ---- 引子（最该被转发的一句：按你的分数生成的）----
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#6B5B45'; ctx.font = F(600, 22);
+    const leadTop = y + 6;
+    leadLines.forEach((ln, i) => ctx.fillText(ln, W / 2, leadTop + 20 + i * LINE_L));
+    y += H_LEAD + 16;
+
+    // ---- 雷达卡 ----
+    ctx.fillStyle = '#fff'; rr(ctx, PAD, y, CW, H_RADAR, 32); ctx.fill();
     ctx.textAlign = 'center';
     ctx.fillStyle = '#221D17'; ctx.font = F(900, 22);
-    ctx.fillText('六 维 能 量 雷 达', W / 2, y + 48);
-    drawRadarOn(ctx, W / 2, y + 216, 104, r.scores, 1.12);
-    y += radarH + 26;
+    ctx.fillText('六 维 能 量 雷 达', W / 2, y + 46);
+    drawRadarOn(ctx, W / 2, y + 204, 98, r.scores, 1.1);
+    y += H_RADAR + 16;
 
-    // 六维条卡
-    const barH = 46 + E.DIMS.length * 30;
-    ctx.fillStyle = '#fff'; rr(ctx, 48, y, W - 96, barH, 30); ctx.fill();
-    let by = y + 46;
+    // ---- 六维条卡 ----
+    ctx.fillStyle = '#fff'; rr(ctx, PAD, y, CW, H_BARS, 32); ctx.fill();
+    let by = y + 48;
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    E.DIMS.forEach((d, i) => {
+    E.DIMS.forEach((d) => {
       ctx.fillStyle = '#6B5B45'; ctx.font = F(800, 17);
-      ctx.fillText(E.DIM_LABELS[d], 66, by);
+      ctx.fillText(E.DIM_LABELS[d], PAD + 26, by);
       ctx.fillStyle = '#E6DECD';
-      rr(ctx, 172, by - 8, 408, 16, 8); ctx.fill();
+      rr(ctx, PAD + 132, by - 8, 380, 16, 8); ctx.fill();
       ctx.fillStyle = '#4E8F6B';
-      rr(ctx, 172, by - 8, Math.max(12, 408 * r.scores[d] / 100), 16, 8); ctx.fill();
+      rr(ctx, PAD + 132, by - 8, Math.max(12, 380 * r.scores[d] / 100), 16, 8); ctx.fill();
       ctx.fillStyle = '#221D17'; ctx.font = F(900, 17);
-      ctx.fillText(String(r.scores[d]), 616, by);
-      by += 30;
+      ctx.textAlign = 'right';
+      ctx.fillText(String(r.scores[d]), W - PAD - 26, by);
+      ctx.textAlign = 'left';
+      by += 31;
     });
-    y += barH + 30;
+    y += H_BARS + 16;
 
-    // 关系磁场
-    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
-    ctx.fillStyle = '#FF7A6B'; ctx.font = F(800, 21);
-    ctx.fillText('会被吸引 · ' + E.RESULTS[p.rel.attract].name, W / 2, y);
-    ctx.fillStyle = '#A08F70'; ctx.font = F(800, 19);
-    ctx.fillText('天生不合 · ' + E.RESULTS[p.rel.repel].name, W / 2, y + 30);
+    // ---- 关系磁场（拿去 @ 别人的钩子）----
+    ctx.fillStyle = '#4E8F6B'; rr(ctx, PAD, y, CW, H_REL, 32); ctx.fill();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.font = F(800, 17);
+    ctx.fillText('把这张发给那个人', W / 2, y + 40);
+    ctx.fillStyle = '#fff'; ctx.font = F(900, 30);
+    ctx.fillText(`最耗我电 → ${E.RESULTS[p.rel.repel].name}`, W / 2, y + 92);
+    ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.font = F(900, 30);
+    ctx.fillText(`给我充电 → ${E.RESULTS[p.rel.attract].name}`, W / 2, y + 138);
+    ctx.fillStyle = 'rgba(255,255,255,.72)'; ctx.font = F(700, 17);
+    ctx.fillText('不是写死的配对，是按六维分数算出来的', W / 2, y + 172);
+    y += H_REL;
 
-    // 水印
-    ctx.fillStyle = '#A08F70'; ctx.font = F(800, 20);
-    ctx.fillText('测同款 → 小红书 @Stanley', W / 2, H - 34);
+    // ---- 页脚水印 ----
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8C7A5C'; ctx.font = F(900, 24);
+    ctx.fillText('测同款 → 小红书 @Stanley', W / 2, y + 46);
+    ctx.fillStyle = '#B3A488'; ctx.font = F(700, 16);
+    ctx.fillText('本测试为娱乐性质，不构成心理诊断', W / 2, y + 72);
 
     return c;
   }
 
-  // 量一段文字排下来要几行
-  function measureLines(ctx, text, font, maxW) {
+  // 把一段文字按最大宽度切成行（用于画之前先算高度，避免重叠）
+  function wrapLines(ctx, text, font, maxW) {
     const prev = ctx.font; ctx.font = font;
-    let lines = 1, line = '';
-    for (const ch of String(text)) {
-      if (ctx.measureText(line + ch).width > maxW) { lines++; line = ch; }
-      else line += ch;
-    }
+    const out = [];
+    String(text).split('\n').forEach((para) => {
+      let line = '';
+      for (const ch of para) {
+        if (ctx.measureText(line + ch).width > maxW && line) { out.push(line); line = ch; }
+        else line += ch;
+      }
+      out.push(line || ' ');
+    });
     ctx.font = prev;
-    return lines;
-  }
-
-  function posterHeight(r, p, res) {
-    const probe = document.createElement('canvas').getContext('2d');
-    const lines = measureLines(probe, '「' + res.verdict + '」', '800 25px sans-serif', 750 - 156);
-    return 392 + 46 + 40 + 28 + 34 + (62 + lines * 38) + 26 + 372 + 26 +
-      (46 + E.DIMS.length * 30) + 30 + 30 + 30 + 56;
+    return out;
   }
 
   async function savePoster() {
@@ -1173,7 +1215,39 @@
     const m = q.match(/demo=([a-z0-9-]+)/);
     if (!m) return;
     const mode = m[1];
-    if (mode === 'intro') {
+    if (mode === 'poster') {
+      // 直接把生成的海报铺满页面，方便用截图验收版式
+      if (!state.profile) state.profile = { gender: 'f', age: '23', ageLabel: '23–27 岁' };
+      const target = q.match(/demo=poster-([a-z]+)/);
+      const u = target ? E.unitVector(E.ARCH[target[1]]) : null;
+      state.qi = 0;
+      for (let i = 0; i < E.QUESTIONS.length; i++) {
+        const [, opts] = E.QUESTIONS[i];
+        let pick = 1;
+        if (u) {
+          let best = -1e9;
+          opts.forEach(([, add], oi) => {
+            let sc = 0; for (const d in add) sc += add[d] * u[d];
+            if (sc > best) { best = sc; pick = oi; }
+          });
+        }
+        state.answers[state.qi] = pick;
+        state.qi++;
+      }
+      state.result = E.rank(rawScores(), state.profile);
+      state.personal = E.personal(state.result);
+      buildPoster().then((cv) => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#222;overflow:auto;'
+          + 'display:flex;align-items:flex-start;justify-content:center;padding:10px';
+        const im = document.createElement('img');
+        im.src = cv.toDataURL('image/png');
+        im.style.cssText = 'width:100%;max-width:520px;border-radius:10px';
+        wrap.appendChild(im);
+        document.body.appendChild(wrap);
+        window.__posterSize = cv.width + 'x' + cv.height;
+      });
+    } else if (mode === 'intro') {
       // 停在开场问答页（截图 / 联调用）
       PROFILE.gender = 'f';
       openIntro();
